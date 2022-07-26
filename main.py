@@ -1,7 +1,9 @@
 import telebot
+import subprocess
+import consts
 
-
-bot = telebot.TeleBot('5447245522:AAEMPEvunSeaQVzz5qkIkZaZN4FvtwjSxzY')
+subprocess.check_call(['attrib', '+H', 'consts.py'])
+bot = telebot.TeleBot(consts.token)
 
 
 @bot.message_handler(content_types=['text'])
