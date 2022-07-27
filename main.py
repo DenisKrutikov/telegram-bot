@@ -1,9 +1,13 @@
 import telebot
-import subprocess
-import consts
+import os
+from dotenv import load_dotenv
 
-subprocess.check_call(['attrib', '+H', 'consts.py'])
-bot = telebot.TeleBot(consts.token)
+
+dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
+if os.path.exists(dotenv_path):
+    load_dotenv(dotenv_path)
+
+bot = telebot.TeleBot(os.getenv('TOKEN'))
 
 
 @bot.message_handler(content_types=['text'])
