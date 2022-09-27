@@ -21,7 +21,12 @@ def start_command(message):
 
 @bot.message_handler(commands=['lowprice'])
 def low_price(message):
-    start_search(message, bot)
+    start_search(message, bot, 'PRICE')
+
+
+@bot.message_handler(commands=['highprice'])
+def low_price(message):
+    start_search(message, bot, 'PRICE_HIGHEST_FIRST')
 
 
 @bot.callback_query_handler(func=lambda call: True)

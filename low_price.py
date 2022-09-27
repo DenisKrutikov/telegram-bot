@@ -8,7 +8,8 @@ city_request = dict()
 hotels_request = []
 
 
-def start_search(message, bot):
+def start_search(message, bot, sort_price):
+    city_request['sort_price'] = sort_price
     hotels_request.clear()
     msg = bot.send_message(message.from_user.id, text='Напиши город, в котором ты хочешь найти отель')
     bot.register_next_step_handler(msg, get_city, bot)
@@ -54,7 +55,7 @@ def get_number_hotels(message, bot):
         return
 
     loading = bot.send_message(message.from_user.id, text='Пожалуйста, подождите...')
-    response = bot_request.hotels_request(city_request, "PRICE")
+    response = bot_request.hotels_request(city_request, city_request['sort_price'])
     hotels = json.loads(response.text)
     bot.delete_message(message.chat.id, loading.message_id)
 
@@ -63,10 +64,10 @@ def get_number_hotels(message, bot):
             {
                 'id': i_hotel['id'],
                 'name': i_hotel['name'],
-                'address': f'{i_hotel["address"]["locality"]}, '
-                           f'{i_hotel["address"]["streetAddress"]}, '
-                           f'{i_hotel["address"]["postalCode"]}, '
-                           f'{i_hotel["address"]["extendedAddress"]}',
+                'address': f'{i_hotel["address"].get("locality", "")}, '
+                           f'{i_hotel["address"].get("streetAddress", "")}, '
+                           f'{i_hotel["address"].get("postalCode", "")}, '
+                           f'{i_hotel["address"].get("extendedAddress", "")}',
                 'price': i_hotel['ratePlan']['price']['current'],
                 'distance to center': ''.join(i_distance['distance']
                                               for i_distance in i_hotel['landmarks']
@@ -74,12 +75,17 @@ def get_number_hotels(message, bot):
             }
         )
 
+    if city_request['sort_price'] == 'PRICE':
+        sorted(hotels_request, key=lambda hotel: hotel['price'])
+    else:
+        sorted(hotels_request, key=lambda hotel: hotel['price'], reverse=True)
+
     add_button(message, bot)
 
 
 def result(message, bot):
     city_request['photo_hotels'] = None
-    for i_hotel in sorted(hotels_request, key=lambda hotel: hotel['price']):
+    for i_hotel in hotels_request:
         bot.send_message(message.from_user.id,
                          text=f'<b>"{i_hotel["name"]}"</b>\n '
                               f'Расстояние до цента: {i_hotel["distance to center"]}\n '
@@ -102,7 +108,7 @@ def get_photo_hotels(message, bot):
 
     bot.send_message(message.from_user.id, text='Результат поиска:')
 
-    for i_hotel in sorted(hotels_request, key=lambda hotel: hotel['price']):
+    for i_hotel in hotels_request:
         photo_count = 0
         photo = list()
         loading = bot.send_message(message.from_user.id, text='Пожалуйста, подождите...')
