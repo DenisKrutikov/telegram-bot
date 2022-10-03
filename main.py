@@ -1,9 +1,9 @@
 import telebot
 import os
 from dotenv import load_dotenv
-from low_price import get_photo_hotels
-from low_price import start_search
-from low_price import result
+from hotel_price import get_photo_hotels
+from hotel_price import start_search
+from hotel_price import result
 
 
 dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
@@ -25,7 +25,7 @@ def low_price(message):
 
 
 @bot.message_handler(commands=['highprice'])
-def low_price(message):
+def high_price(message):
     start_search(message, bot, 'PRICE_HIGHEST_FIRST')
 
 
