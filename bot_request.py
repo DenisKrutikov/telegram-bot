@@ -1,7 +1,7 @@
 import os
 import requests
 from dotenv import load_dotenv
-from datetime import date
+from datetime import date, timedelta
 
 
 dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
@@ -23,10 +23,11 @@ def city_request(city):
 
 def hotels_request(city, sort_order):
     url = "https://hotels4.p.rapidapi.com/properties/list"
-    now = date.today()
+    today = date.today()
+    tomorrow = today + timedelta(days=1)
     querystring = {
-        "destinationId": city['destinationId'], "pageNumber": "1", "pageSize": city['number_hotels'], "checkIn": now,
-        "checkOut": now, "adults1": "1", "sortOrder": sort_order, "locale": "ru_RU", "currency": "RUB"
+        "destinationId": city['destinationId'], "pageNumber": "1", "pageSize": city['number_hotels'], "checkIn": today,
+        "checkOut": tomorrow, "adults1": "1", "sortOrder": sort_order, "locale": "ru_RU", "currency": "RUB"
     }
     return requests.request("GET", url, headers=headers, params=querystring, timeout=timeout)
 
