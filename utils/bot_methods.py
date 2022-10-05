@@ -1,7 +1,8 @@
 from telebot import types
+from loader import bot
 
 
-def add_button(message, bot):
+def add_button(message):
     keyboard = types.InlineKeyboardMarkup()
     key_yes = types.InlineKeyboardButton(text='Показать', callback_data='yes')
     keyboard.add(key_yes)

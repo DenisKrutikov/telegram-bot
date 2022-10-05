@@ -1,21 +1,22 @@
 import json
 import telebot
-import bot_request
-from bot_methods import add_button
+from utils import bot_request
+from loader import bot
+from utils.bot_methods import add_button
 
 
 city_request = dict()
 hotels_request = []
 
 
-def start_search(message, bot, sort_price):
+def start_search(message, sort_price):
     city_request['sort_price'] = sort_price
     hotels_request.clear()
     msg = bot.send_message(message.from_user.id, text='Напиши город, в котором ты хочешь найти отель')
-    bot.register_next_step_handler(msg, get_city, bot)
+    bot.register_next_step_handler(msg, get_city)
 
 
-def get_city(message, bot):
+def get_city(message):
     try:
         city_request['city'] = message.text
         loading = bot.send_message(message.from_user.id, text='Пожалуйста, подождите...')
@@ -34,17 +35,17 @@ def get_city(message, bot):
 
         bot.delete_message(message.chat.id, loading.message_id)
         msg = bot.send_message(message.from_user.id, text='Напиши количество отелей (не больше 10)')
-        bot.register_next_step_handler(msg, get_number_hotels, bot)
+        bot.register_next_step_handler(msg, get_number_hotels)
 
     except Exception:
         bot.delete_message(message.chat.id, loading.message_id)
         msg = bot.send_message(message.from_user.id,
                                text='Неправильно введен город или такой город не найден. Попробуйте еще раз.')
-        bot.register_next_step_handler(msg, get_city, bot)
+        bot.register_next_step_handler(msg, get_city)
         return
 
 
-def get_number_hotels(message, bot):
+def get_number_hotels(message):
     try:
         city_request['number_hotels'] = int(message.text)
         if city_request['number_hotels'] > 10:
@@ -76,17 +77,17 @@ def get_number_hotels(message, bot):
         else:
             sorted(hotels_request, key=lambda hotel: hotel['price'], reverse=True)
 
-        add_button(message, bot)
+        add_button(message)
 
     except ValueError:
         msg = bot.send_message(message.from_user.id, text='Ошибка. Введите число от 1 до 10.')
-        bot.register_next_step_handler(msg, get_number_hotels, bot)
+        bot.register_next_step_handler(msg, get_number_hotels)
         return
     except KeyError:
         bot.send_message(message.from_user.id, text='Ошибка запроса.')
 
 
-def result(message, bot):
+def result(message):
     city_request['photo_hotels'] = None
     for i_hotel in hotels_request:
         bot.send_message(message.from_user.id,
@@ -99,7 +100,7 @@ def result(message, bot):
                          )
 
 
-def get_photo_hotels(message, bot):
+def get_photo_hotels(message):
     try:
         city_request['photo_hotels'] = int(message.text)
         if city_request['photo_hotels'] > 10:
@@ -139,5 +140,5 @@ def get_photo_hotels(message, bot):
 
     except ValueError:
         msg = bot.send_message(message.from_user.id, text='Ошибка. Введите число от 1 до 10.')
-        bot.register_next_step_handler(msg, get_photo_hotels, bot)
+        bot.register_next_step_handler(msg, get_photo_hotels)
         return

@@ -1,16 +1,7 @@
-import telebot
-import os
-from dotenv import load_dotenv
-from hotel_price import get_photo_hotels
-from hotel_price import start_search
-from hotel_price import result
-
-
-dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
-if os.path.exists(dotenv_path):
-    load_dotenv(dotenv_path)
-
-bot = telebot.TeleBot(os.getenv('TOKEN'), parse_mode='HTML')
+from handlers.hotel_price import get_photo_hotels
+from handlers.hotel_price import start_search
+from handlers.hotel_price import result
+from loader import bot
 
 
 @bot.message_handler(commands=['start'])
@@ -21,21 +12,21 @@ def start_command(message):
 
 @bot.message_handler(commands=['lowprice'])
 def low_price(message):
-    start_search(message, bot, 'PRICE')
+    start_search(message, 'PRICE')
 
 
 @bot.message_handler(commands=['highprice'])
 def high_price(message):
-    start_search(message, bot, 'PRICE_HIGHEST_FIRST')
+    start_search(message, 'PRICE_HIGHEST_FIRST')
 
 
 @bot.callback_query_handler(func=lambda call: True)
 def callback_worker(call):
     if call.data == 'yes':
         msg = bot.send_message(chat_id=call.message.chat.id, text='Сколько фото показать? (не больше 10)')
-        bot.register_next_step_handler(msg, get_photo_hotels, bot)
+        bot.register_next_step_handler(msg, get_photo_hotels)
     if call.data == 'no':
-        result(call, bot)
+        result(call)
     bot.delete_message(call.message.chat.id, call.message.message_id)
 
 

@@ -1,16 +1,11 @@
-import os
 import requests
-from dotenv import load_dotenv
+from config_data import config
 from datetime import date, timedelta
 
 
-dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
-if os.path.exists(dotenv_path):
-    load_dotenv(dotenv_path)
-
 timeout = 15
 headers = {
-    "X-RapidAPI-Key": os.getenv('API_KEY'),
+    "X-RapidAPI-Key": config.RAPID_API_KEY,
     "X-RapidAPI-Host": "hotels4.p.rapidapi.com"
 }
 
