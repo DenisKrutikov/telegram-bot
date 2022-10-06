@@ -21,6 +21,7 @@ def get_city(message):
         city_request['city'] = message.text
         loading = bot.send_message(message.from_user.id, text='Пожалуйста, подождите...')
         response = bot_request.city_request(city_request['city'])
+        print()
         city = json.loads(response.text)
 
         if city['suggestions'][0]['entities']:

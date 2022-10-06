@@ -1,3 +1,4 @@
+from Users.user_info import Users
 from handlers.hotel_price import get_photo_hotels
 from handlers.hotel_price import start_search
 from handlers.hotel_price import result
@@ -12,11 +13,15 @@ def start_command(message):
 
 @bot.message_handler(commands=['lowprice'])
 def low_price(message):
+    user = Users.get_user(message.from_user.id)
+    user.command = 'lowprice'
     start_search(message, 'PRICE')
 
 
 @bot.message_handler(commands=['highprice'])
 def high_price(message):
+    user = Users.get_user(message.from_user.id)
+    user.command = 'highprice'
     start_search(message, 'PRICE_HIGHEST_FIRST')
 
 
