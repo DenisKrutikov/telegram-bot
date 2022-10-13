@@ -1,5 +1,12 @@
-from telebot import types
+
+import datetime
 from loader import bot
+from telebot import types
+from utils.bot_calendar import Calendar, RUSSIAN_LANGUAGE, CallbackData
+
+
+calendar = Calendar(language=RUSSIAN_LANGUAGE)
+calendar_1_callback = CallbackData("calendar_1", "action", "year", "month", "day")
 
 
 def add_button(message):
@@ -11,4 +18,15 @@ def add_button(message):
     bot.send_message(message.from_user.id, text='Показать фото отелей?', reply_markup=keyboard)
 
 
+def add_calendar(message):
+    now = datetime.datetime.now()
+    bot.send_message(
+        message.chat.id,
+        f"Календарь:",
+        reply_markup=calendar.create_calendar(
+            name=calendar_1_callback.prefix,
+            year=now.year,
+            month=now.month,
+        ),
+    )
 

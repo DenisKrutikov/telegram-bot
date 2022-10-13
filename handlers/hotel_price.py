@@ -1,16 +1,15 @@
+import datetime
 import json
 import telebot
+from users.user_info import Users
 from utils import bot_request
 from loader import bot
-from utils.bot_methods import add_button
+from utils.bot_methods import add_button, add_calendar
 
-
-city_request = dict()
 hotels_request = []
 
 
-def start_search(message, sort_price):
-    city_request['sort_price'] = sort_price
+def start_search(message):
     hotels_request.clear()
     msg = bot.send_message(message.from_user.id, text='Напиши город, в котором ты хочешь найти отель')
     bot.register_next_step_handler(msg, get_city)
@@ -18,16 +17,16 @@ def start_search(message, sort_price):
 
 def get_city(message):
     try:
-        city_request['city'] = message.text
+        user = Users.get_user(message.from_user.id)
+        user.city = message.text
         loading = bot.send_message(message.from_user.id, text='Пожалуйста, подождите...')
-        response = bot_request.city_request(city_request['city'])
-        print()
+        response = bot_request.city_request(user.city)
         city = json.loads(response.text)
 
         if city['suggestions'][0]['entities']:
             for i_entities in city['suggestions'][0]['entities']:
                 if i_entities['name'].lower() == message.text.lower():
-                    city_request['destinationId'] = i_entities['destinationId']
+                    user.city_id = i_entities['destinationId']
                     break
             else:
                 raise Exception
@@ -35,10 +34,12 @@ def get_city(message):
             raise Exception
 
         bot.delete_message(message.chat.id, loading.message_id)
-        msg = bot.send_message(message.from_user.id, text='Напиши количество отелей (не больше 10)')
-        bot.register_next_step_handler(msg, get_number_hotels)
+        bot.send_message(message.from_user.id, text='Выберите дату заезда.', reply_markup=add_calendar(message))
+        user.action = 'check_in'
 
-    except Exception:
+
+    except Exception as a:
+        print(a)
         bot.delete_message(message.chat.id, loading.message_id)
         msg = bot.send_message(message.from_user.id,
                                text='Неправильно введен город или такой город не найден. Попробуйте еще раз.')
@@ -48,12 +49,15 @@ def get_city(message):
 
 def get_number_hotels(message):
     try:
-        city_request['number_hotels'] = int(message.text)
-        if city_request['number_hotels'] > 10:
+        user = Users.get_user(message.from_user.id)
+        user.hotels_count = int(message.text)
+        if user.hotels_count > 10:
             raise ValueError
 
         loading = bot.send_message(message.from_user.id, text='Пожалуйста, подождите...')
-        response = bot_request.hotels_request(city_request, city_request['sort_price'])
+        response = bot_request.hotels_request(user,
+                                              'PRICE' if user.command == '/lowprice' else 'PRICE_HIGHEST_FIRST'
+                                              )
         hotels = json.loads(response.text)
         bot.delete_message(message.chat.id, loading.message_id)
 
@@ -73,7 +77,7 @@ def get_number_hotels(message):
                 }
             )
 
-        if city_request['sort_price'] == 'PRICE':
+        if user.command == '/lowprice':
             sorted(hotels_request, key=lambda hotel: hotel['price'])
         else:
             sorted(hotels_request, key=lambda hotel: hotel['price'], reverse=True)
@@ -89,7 +93,7 @@ def get_number_hotels(message):
 
 
 def result(message):
-    city_request['photo_hotels'] = None
+    bot.send_message(message.from_user.id, text='Результат поиска:')
     for i_hotel in hotels_request:
         bot.send_message(message.from_user.id,
                          text=f'<b>"{i_hotel["name"]}"</b>\n '
@@ -103,8 +107,9 @@ def result(message):
 
 def get_photo_hotels(message):
     try:
-        city_request['photo_hotels'] = int(message.text)
-        if city_request['photo_hotels'] > 10:
+        user = Users.get_user(message.from_user.id)
+        user.photo_hotels = int(message.text)
+        if user.photo_hotels > 10:
             raise ValueError
 
         bot.send_message(message.from_user.id, text='Результат поиска:')
@@ -122,7 +127,7 @@ def get_photo_hotels(message):
             photo_hotel = json.loads(response.text)
 
             for i_photo in photo_hotel['hotelImages']:
-                if photo_count < city_request['photo_hotels']:
+                if photo_count < user.photo_hotels:
                     photo_count += 1
                     photo.append(i_photo['baseUrl'].format(size='z'))
                 else:

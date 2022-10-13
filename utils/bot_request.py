@@ -1,4 +1,5 @@
 import requests
+
 from config_data import config
 from datetime import date, timedelta
 
@@ -16,13 +17,25 @@ def city_request(city):
     return requests.request("GET", url, headers=headers, params=querystring, timeout=timeout)
 
 
-def hotels_request(city, sort_order):
+def hotels_request(user, sort_order):
     url = "https://hotels4.p.rapidapi.com/properties/list"
     today = date.today()
     tomorrow = today + timedelta(days=1)
     querystring = {
-        "destinationId": city['destinationId'], "pageNumber": "1", "pageSize": city['number_hotels'], "checkIn": today,
+        "destinationId": user.city_id, "pageNumber": "1", "pageSize": user.hotels_count, "checkIn": today,
         "checkOut": tomorrow, "adults1": "1", "sortOrder": sort_order, "locale": "ru_RU", "currency": "RUB"
+    }
+    return requests.request("GET", url, headers=headers, params=querystring, timeout=timeout)
+
+
+def hotels_request_bd(user):
+    url = "https://hotels4.p.rapidapi.com/properties/list"
+    today = date.today()
+    tomorrow = today + timedelta(days=1)
+    querystring = {
+        "destinationId": user.city_id, "pageNumber": 1, "pageSize": user.hotels_count, "checkIn": today,
+        "checkOut": tomorrow, "adults1": 1, "priceMin": user.min_price, "priceMax": user.max_price,
+        "sortOrder": "DISTANCE_FROM_LANDMARK", "locale": "ru_RU", "currency": "RUB", "landmarkIds": "Центр города"
     }
     return requests.request("GET", url, headers=headers, params=querystring, timeout=timeout)
 
