@@ -1,13 +1,11 @@
 import datetime
-
+import telebot
+from loader import bot
 from telebot.types import ReplyKeyboardRemove
-
-from handlers.best_deal import start_search_bd, get_photo_hotels_bd, result_bd
 from users.user_info import Users
 from handlers.hotel_price import get_photo_hotels, get_number_hotels
 from handlers.hotel_price import start_search
 from handlers.hotel_price import result
-from loader import bot
 from utils.bot_methods import calendar, calendar_1_callback, add_calendar
 
 
@@ -17,47 +15,41 @@ def start_command(message):
     bot.send_message(message.from_user.id, text='Я помогу тебе подобрать отель')
 
 
-@bot.message_handler(commands=['lowprice'])
+@bot.message_handler(commands=['lowprice', 'highprice', 'beastdeal'])
 def low_price(message):
     user = Users.get_user(message.from_user.id)
-    user.command = '/lowprice'
+    user.command = message.text
     start_search(message)
-
-
-@bot.message_handler(commands=['highprice'])
-def high_price(message):
-    user = Users.get_user(message.from_user.id)
-    user.command = '/highprice'
-    start_search(message)
-
-
-@bot.message_handler(commands=['beastdeal'])
-def beast_deal(message):
-    user = Users.get_user(message.from_user.id)
-    user.command = '/beastdeal'
-    start_search_bd(message)
 
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith(calendar_1_callback.prefix))
 def callback_inline(call):
     user = Users.get_user(call.from_user.id)
     name, action, year, month, day = call.data.split(calendar_1_callback.sep)
-    date = calendar.calendar_query_handler(bot=bot, call=call, name=name, action=action, year=year, month=month, day=day)
+    date = calendar.calendar_query_handler(
+        bot=bot,
+        call=call,
+        name=name,
+        action=action,
+        year=year,
+        month=month,
+        day=day
+    )
 
     if action == "DAY":
         if date < datetime.datetime.now():
-            bot.send_message(call.from_user.id,
-                             text=f'Ошибка. Дата не может быть меньше сегодняшней.\n '
-                                  f'Выберите дату заезда.',
-                             reply_markup=add_calendar(call.message)
-                             )
+            bot.send_message(
+                chat_id=call.from_user.id,
+                text=f'Ошибка. Дата не может быть меньше сегодняшней.\n Выберите дату заезда.',
+                reply_markup=add_calendar(call.message)
+            )
             return
         elif user.check_in is not None and date < user.check_in:
-            bot.send_message(call.from_user.id,
-                             text=f'Ошибка. Дата не может быть меньше даты заезда.\n '
-                                  f'Выберите дату выезда".',
-                             reply_markup=add_calendar(call.message)
-                             )
+            bot.send_message(
+                chat_id=call.from_user.id,
+                text=f'Ошибка. Дата не может быть меньше даты заезда.\n Выберите дату выезда".',
+                reply_markup=add_calendar(call.message)
+            )
             return
         bot.send_message(
             chat_id=call.from_user.id,
@@ -66,35 +58,38 @@ def callback_inline(call):
         )
         if user.action == 'check_in':
             user.check_in = date
-            bot.send_message(call.from_user.id, text='Выберите дату выезда.', reply_markup=add_calendar(call.message))
+            bot.send_message(
+                chat_id=call.from_user.id,
+                text='Выберите дату выезда.',
+                reply_markup=add_calendar(call.message)
+            )
             user.action = 'check_out'
         else:
             user.check_out = date
-            msg = bot.send_message(call.from_user.id, text='Напиши количество отелей (не больше 10)')
+            msg = bot.send_message(
+                chat_id=call.from_user.id,
+                text='Напиши количество отелей (не больше 10)'
+            )
             bot.register_next_step_handler(msg, get_number_hotels)
 
     elif action == "CANCEL":
         bot.send_message(
             chat_id=call.from_user.id,
-            text="Cancellation",
+            text="Отмена",
             reply_markup=ReplyKeyboardRemove()
         )
 
 
 @bot.callback_query_handler(func=lambda call: True)
 def callback_worker(call):
-    user = Users.get_user(call.from_user.id)
     if call.data == 'yes':
-        msg = bot.send_message(chat_id=call.message.chat.id, text='Сколько фото показать? (не больше 10)')
-        if user.command == '/beastdeal':
-            bot.register_next_step_handler(msg, get_photo_hotels_bd)
-        else:
-            bot.register_next_step_handler(msg, get_photo_hotels)
+        msg = bot.send_message(
+            chat_id=call.message.chat.id,
+            text='Сколько фото показать? (не больше 10)'
+        )
+        bot.register_next_step_handler(msg, get_photo_hotels)
     if call.data == 'no':
-        if user.command == '/beastdeal':
-            result_bd(call)
-        else:
-            result(call)
+        result(call)
     bot.delete_message(call.message.chat.id, call.message.message_id)
 
 
@@ -107,4 +102,10 @@ def get_text_messages(message):
 
 
 if __name__ == '__main__':
+    bot.set_my_commands([
+        telebot.types.BotCommand("/start", "Запуск бота"),
+        telebot.types.BotCommand("/lowprice", "Топ самых дешёвых отелей"),
+        telebot.types.BotCommand("/highprice", "Топ самых дорогих отелей "),
+        telebot.types.BotCommand("/beastdeal", "Топ отелей, наиболее подходящих по цене и расположению от центра"),
+    ])
     bot.polling(none_stop=True)

@@ -14,6 +14,7 @@ class Users:
         self.max_distance = None
         self.hotels_count = None
         self.photo_hotels = None
+        self.hotel_list = []
         self.action = None
         Users.add_user(user_id, self)
 

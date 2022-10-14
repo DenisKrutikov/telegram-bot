@@ -1,10 +1,9 @@
-import datetime
-import json
 import telebot
+from config_data import config
 from users.user_info import Users
-from utils import bot_request
 from loader import bot
 from utils.bot_methods import add_button, add_calendar
+from utils.bot_request import api_request
 
 hotels_request = []
 
@@ -16,12 +15,14 @@ def start_search(message):
 
 
 def get_city(message):
+    loading = bot.send_message(message.from_user.id, text='Пожалуйста, подождите...')
     try:
         user = Users.get_user(message.from_user.id)
         user.city = message.text
-        loading = bot.send_message(message.from_user.id, text='Пожалуйста, подождите...')
-        response = bot_request.city_request(user.city)
-        city = json.loads(response.text)
+
+        url = "https://hotels4.p.rapidapi.com/locations/v2/search"
+        querystring = {"query": user.city, "locale": config.LOCALE, "currency": config.CURRENCY}
+        city = api_request(url, querystring, message)
 
         if city['suggestions'][0]['entities']:
             for i_entities in city['suggestions'][0]['entities']:
@@ -29,37 +30,59 @@ def get_city(message):
                     user.city_id = i_entities['destinationId']
                     break
             else:
-                raise Exception
+                raise ValueError
         else:
-            raise Exception
+            raise KeyError
 
         bot.delete_message(message.chat.id, loading.message_id)
-        bot.send_message(message.from_user.id, text='Выберите дату заезда.', reply_markup=add_calendar(message))
+        bot.send_message(
+            message.from_user.id,
+            text='Выберите дату заезда.',
+            reply_markup=add_calendar(message)
+        )
         user.action = 'check_in'
 
-
-    except Exception as a:
-        print(a)
+    except (ValueError, KeyError, TypeError):
         bot.delete_message(message.chat.id, loading.message_id)
-        msg = bot.send_message(message.from_user.id,
-                               text='Неправильно введен город или такой город не найден. Попробуйте еще раз.')
+        msg = bot.send_message(
+            message.from_user.id,
+            text='Неправильно введен город или такой город не найден. Попробуйте еще раз.'
+        )
         bot.register_next_step_handler(msg, get_city)
         return
 
 
 def get_number_hotels(message):
+    loading = bot.send_message(message.from_user.id, text='Пожалуйста, подождите...')
     try:
         user = Users.get_user(message.from_user.id)
         user.hotels_count = int(message.text)
         if user.hotels_count > 10:
             raise ValueError
 
-        loading = bot.send_message(message.from_user.id, text='Пожалуйста, подождите...')
-        response = bot_request.hotels_request(user,
-                                              'PRICE' if user.command == '/lowprice' else 'PRICE_HIGHEST_FIRST'
-                                              )
-        hotels = json.loads(response.text)
-        bot.delete_message(message.chat.id, loading.message_id)
+        if user.command == '/highprice':
+            sort_order = 'PRICE_HIGHEST_FIRST'
+        elif user.command == '/beastdeal':
+            sort_order = 'DISTANCE_FROM_LANDMARK'
+        else:
+            sort_order = 'PRICE'
+
+        url = "https://hotels4.p.rapidapi.com/properties/list"
+        querystring = {
+            "destinationId": user.city_id,
+            "pageNumber": 1,
+            "pageSize": user.hotels_count,
+            "checkIn": user.check_in.strftime('%Y-%m-%d'),
+            "checkOut": user.check_out.strftime('%Y-%m-%d'),
+            "adults1": 1,
+            "priceMin": user.min_price,
+            "priceMax": user.max_price,
+            "sortOrder": sort_order,
+            "locale": config.LOCALE,
+            "currency": config.CURRENCY,
+            "landmarkIds": "Центр города"
+        }
+        hotels = api_request(url, querystring, message)
 
         for i_hotel in hotels['data']['body']['searchResults']['results']:
             hotels_request.append(
@@ -82,6 +105,7 @@ def get_number_hotels(message):
         else:
             sorted(hotels_request, key=lambda hotel: hotel['price'], reverse=True)
 
+        bot.delete_message(message.chat.id, loading.message_id)
         add_button(message)
 
     except ValueError:
@@ -92,25 +116,13 @@ def get_number_hotels(message):
         bot.send_message(message.from_user.id, text='Ошибка запроса.')
 
 
-def result(message):
-    bot.send_message(message.from_user.id, text='Результат поиска:')
-    for i_hotel in hotels_request:
-        bot.send_message(message.from_user.id,
-                         text=f'<b>"{i_hotel["name"]}"</b>\n '
-                              f'Расстояние до цента: {i_hotel["distance to center"]}\n '
-                              f'Цена: {i_hotel["price"]}\n '
-                              f'Адрес: {i_hotel["address"]}\n '
-                              f'Сайт: <a href="hotels.com/ho{i_hotel["id"]}">hotels.com/ho{i_hotel["id"]}</a>',
-                         disable_web_page_preview=True
-                         )
-
-
 def get_photo_hotels(message):
     try:
         user = Users.get_user(message.from_user.id)
         user.photo_hotels = int(message.text)
         if user.photo_hotels > 10:
             raise ValueError
+        url = "https://hotels4.p.rapidapi.com/properties/get-hotel-photos"
 
         bot.send_message(message.from_user.id, text='Результат поиска:')
 
@@ -123,8 +135,8 @@ def get_photo_hotels(message):
                    f'Цена: {i_hotel["price"]}\n '\
                    f'Адрес: {i_hotel["address"]}\n '\
                    f'Сайт: <a href="hotels.com/ho{i_hotel["id"]}">hotels.com/ho{i_hotel["id"]}</a>'
-            response = bot_request.photo_request(i_hotel)
-            photo_hotel = json.loads(response.text)
+            querystring = {"id": i_hotel['id']}
+            photo_hotel = api_request(url, querystring, message)
 
             for i_photo in photo_hotel['hotelImages']:
                 if photo_count < user.photo_hotels:
@@ -148,3 +160,16 @@ def get_photo_hotels(message):
         msg = bot.send_message(message.from_user.id, text='Ошибка. Введите число от 1 до 10.')
         bot.register_next_step_handler(msg, get_photo_hotels)
         return
+
+
+def result(message):
+    bot.send_message(message.from_user.id, text='Результат поиска:')
+    for i_hotel in hotels_request:
+        bot.send_message(message.from_user.id,
+                         text=f'<b>"{i_hotel["name"]}"</b>\n '
+                              f'Расстояние до цента: {i_hotel["distance to center"]}\n '
+                              f'Цена: {i_hotel["price"]}\n '
+                              f'Адрес: {i_hotel["address"]}\n '
+                              f'Сайт: <a href="hotels.com/ho{i_hotel["id"]}">hotels.com/ho{i_hotel["id"]}</a>',
+                         disable_web_page_preview=True
+                         )
