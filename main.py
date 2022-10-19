@@ -1,9 +1,9 @@
 import datetime
 import telebot
+from telebot import types
 from loader import bot
-from telebot.types import ReplyKeyboardRemove
 from users.user_info import Users
-from handlers.hotel_price import get_photo_hotels, get_number_hotels
+from handlers.hotel_price import get_photo_hotels, min_price, get_number_hotels
 from handlers.hotel_price import start_search
 from handlers.hotel_price import result
 from utils.bot_methods import calendar, calendar_1_callback, add_calendar
@@ -16,15 +16,15 @@ def start_command(message):
 
 
 @bot.message_handler(commands=['lowprice', 'highprice', 'beastdeal'])
-def low_price(message):
+def price_command(message):
     user = Users.get_user(message.from_user.id)
+    user.cleaning()
     user.command = message.text
     start_search(message)
 
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith(calendar_1_callback.prefix))
 def callback_inline(call):
-    user = Users.get_user(call.from_user.id)
     name, action, year, month, day = call.data.split(calendar_1_callback.sep)
     date = calendar.calendar_query_handler(
         bot=bot,
@@ -36,6 +36,7 @@ def callback_inline(call):
         day=day
     )
 
+    user = Users.get_user(call.from_user.id)
     if action == "DAY":
         if date < datetime.datetime.now():
             bot.send_message(
@@ -44,39 +45,48 @@ def callback_inline(call):
                 reply_markup=add_calendar(call.message)
             )
             return
-        elif user.check_in is not None and date < user.check_in:
+        elif user.check_in is not None and date <= user.check_in:
             bot.send_message(
                 chat_id=call.from_user.id,
                 text=f'Ошибка. Дата не может быть меньше даты заезда.\n Выберите дату выезда".',
                 reply_markup=add_calendar(call.message)
             )
             return
-        bot.send_message(
-            chat_id=call.from_user.id,
-            text=f"Вы выбрали: {date.strftime('%d.%m.%Y')}",
-            reply_markup=ReplyKeyboardRemove()
-        )
-        if user.action == 'check_in':
-            user.check_in = date
+        else:
             bot.send_message(
                 chat_id=call.from_user.id,
-                text='Выберите дату выезда.',
-                reply_markup=add_calendar(call.message)
+                text=f"Вы выбрали: {date.strftime('%d.%m.%Y')}",
+                reply_markup=types.ReplyKeyboardRemove()
             )
-            user.action = 'check_out'
-        else:
-            user.check_out = date
-            msg = bot.send_message(
-                chat_id=call.from_user.id,
-                text='Напиши количество отелей (не больше 10)'
-            )
-            bot.register_next_step_handler(msg, get_number_hotels)
+            if user.action == 'check_in':
+                user.check_in = date
+                bot.send_message(
+                    chat_id=call.from_user.id,
+                    text='Выберите дату выезда.',
+                    reply_markup=add_calendar(call.message)
+                )
+                user.action = 'check_out'
+            else:
+                user.check_out = date
+
+                if user.command == '/beastdeal':
+                    msg = bot.send_message(
+                        chat_id=call.from_user.id,
+                        text='Напиши минимальную цену'
+                    )
+                    bot.register_next_step_handler(msg, min_price)
+                else:
+                    msg = bot.send_message(
+                        chat_id=call.from_user.id,
+                        text='Напиши количество отелей (не больше 10)'
+                    )
+                    bot.register_next_step_handler(msg, get_number_hotels)
 
     elif action == "CANCEL":
         bot.send_message(
             chat_id=call.from_user.id,
             text="Отмена",
-            reply_markup=ReplyKeyboardRemove()
+            reply_markup=types.ReplyKeyboardRemove()
         )
 
 

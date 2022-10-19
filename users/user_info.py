@@ -28,3 +28,16 @@ class Users:
     @classmethod
     def add_user(cls, user_id, user):
         cls.all_users[user_id] = user
+
+    def cleaning(self):
+        self.city = None
+        self.city_id = None
+        self.check_in = None
+        self.check_out = None
+        self.min_price = None
+        self.max_price = None
+        self.min_distance = None
+        self.max_distance = None
+        self.hotels_count = None
+        self.photo_hotels = None
+        self.hotel_list = []

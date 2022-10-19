@@ -15,4 +15,4 @@ def api_request(url, querystring, message):
         response = requests.request("GET", url, headers=headers, params=querystring, timeout=timeout)
         return json.loads(response.text)
     except requests.exceptions.ReadTimeout:
-        bot.send_message(message.from_user.id, text='Ошибка запроса.')
+        bot.send_message(message.from_user.id, text='Ошибка запроса API.')
