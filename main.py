@@ -58,7 +58,7 @@ def callback_inline(call):
                 reply_markup=add_calendar(call.message)
             )
             return
-        elif user.check_in is not None and date <= user.check_in:
+        elif user.check_in and date <= user.check_in:
             bot.send_message(
                 chat_id=call.from_user.id,
                 text='Ошибка. Дата не может быть меньше даты заезда.\n '
