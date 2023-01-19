@@ -56,3 +56,14 @@ def add_history(message):
                         user.city,
                         ', '.join(hotels))
                        )
+
+
+def declination(day):
+    exclusion_list = [11, 12, 13, 14]
+    number = day % 10
+    if number == 1 and day not in exclusion_list:
+        return 'ь'
+    elif number in [2, 3, 4] and day not in exclusion_list:
+        return 'я'
+    else:
+        return 'ей'

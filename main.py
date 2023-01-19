@@ -111,10 +111,11 @@ def callback_worker(call):
             chat_id=call.message.chat.id,
             text='Сколько фото показать? (не больше 10)'
         )
+        bot.delete_message(call.message.chat.id, call.message.message_id)
         bot.register_next_step_handler(msg, get_photo_hotels)
     if call.data == 'no':
+        bot.delete_message(call.message.chat.id, call.message.message_id)
         result(call)
-    bot.delete_message(call.message.chat.id, call.message.message_id)
 
 
 @bot.message_handler(commands=['help'])
@@ -133,7 +134,7 @@ def get_text_messages(message):
     else:
         bot.send_message(
             message.from_user.id,
-            text='Я тебя не понимаю. Введите /help.'
+            text='Я тебя не понимаю. Введите /help. '
         )
 
 

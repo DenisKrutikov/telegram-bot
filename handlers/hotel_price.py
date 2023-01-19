@@ -1,11 +1,9 @@
-import json
-import re
 import telebot
 from config_data import config
 from users.user_info import Users
 from loader import bot
-from utils.bot_methods import add_button, add_calendar, add_history
-from utils.bot_request import api_request, city_request, hotel_request
+from utils.bot_methods import add_button, add_calendar, add_history, declination
+from utils.bot_request import city_request, hotel_request
 
 
 def start_search(message):
@@ -22,20 +20,9 @@ def get_city(message):
         text='Пожалуйста, подождите...'
     )
     user = Users.get_user(message.from_user.id)
+    user.city = message.text
 
-    if message.text.isalpha():
-        user.city = message.text
-    else:
-        bot.delete_message(message.chat.id, loading.message_id)
-        msg = bot.send_message(
-            message.from_user.id,
-            text='Неправильно введен город.'
-                 'Попробуйте еще раз.'
-        )
-        bot.register_next_step_handler(msg, get_city)
-        return
-
-    city_request(user)
+    city_request(user, message)
     if not user.city_id:
         msg = bot.send_message(
             message.from_user.id,
@@ -60,60 +47,13 @@ def get_number_hotels(message):
         text='Пожалуйста, подождите...'
     )
     user = Users.get_user(message.from_user.id)
-    days = (user.check_out - user.check_in).days
     try:
         user.hotels_count = int(message.text)
         if user.hotels_count > 10:
             raise ValueError
 
-        hotel_request(user)
-
-        for i_hotel in hotels['data']['body']['searchResults']['results']:
-            if len(user.hotel_list) < user.hotels_count:
-                hotel_info = dict()
-                hotel_info['id'] = i_hotel['id']
-                hotel_info['name'] = i_hotel['name']
-                hotel_info['address'] = \
-                    f'{i_hotel["address"].get("locality", "")},' \
-                    f'{i_hotel["address"].get("streetAddress", "")}, '\
-                    f'{i_hotel["address"].get("postalCode", "")}, '\
-                    f'{i_hotel["address"].get("extendedAddress", "")}'
-                hotel_info['price'] = \
-                    i_hotel['ratePlan']['price']['exactCurrent']
-                hotel_info['total price'] = \
-                    i_hotel['ratePlan']['price']['exactCurrent'] * days
-                hotel_info['distance to center'] = \
-                    ''.join(i_distance['distance']
-                            for i_distance in i_hotel['landmarks']
-                            if i_distance['label'] == 'Центр города')
-            else:
-                break
-
-            if user.command == '/beastdeal':
-                if user.min_distance < \
-                        float(
-                            re.search(
-                                r'-?\d+,*\d*',
-                                hotel_info['distance to center']
-                            ).group().replace(',', '.')) \
-                        < user.max_distance:
-                    user.hotel_list.append(hotel_info)
-            else:
-                user.hotel_list.append(hotel_info)
-
-        if user.command == '/lowprice':
-            sorted(user.hotel_list,
-                   key=lambda hotel: hotel['price']
-                   )
-        else:
-            sorted(user.hotel_list,
-                   key=lambda hotel: hotel['price'],
-                   reverse=True
-                   )
-
-        bot.delete_message(message.chat.id, loading.message_id)
-        add_history(message)
         add_button(message)
+        bot.delete_message(message.chat.id, loading.message_id)
 
     except (ValueError, KeyError):
         msg = bot.send_message(
@@ -139,36 +79,29 @@ def get_photo_hotels(message):
         )
         bot.register_next_step_handler(msg, get_photo_hotels)
         return
-
-    url = "https://hotels4.p.rapidapi.com/properties/get-hotel-photos"
-
+    loading = bot.send_message(
+        message.from_user.id,
+        text='Пожалуйста, подождите...'
+    )
+    hotel_request(user, message)
+    add_history(message)
+    bot.delete_message(message.chat.id, loading.message_id)
+    amount_hotels = len(user.hotel_list)
     bot.send_message(
         message.from_user.id,
-        text=f'Найдено {len(user.hotel_list)} отелей:'
+        text=f'Найдено {amount_hotels} отел{declination(amount_hotels)}:'
     )
+    amount_days = (user.check_out - user.check_in).days
     for i_hotel in user.hotel_list:
-        photo = list()
-        loading = bot.send_message(
-            message.from_user.id,
-            text='Пожалуйста, подождите...'
-        )
         text = f'<b>"{i_hotel["name"]}"</b>\n' \
-               f'Расстояние до цента: {i_hotel["distance to center"]}\n' \
-               f'Цена за сутки: {i_hotel["price"]:,.2f} ' \
-               f'{config.CURRENCY}\n' \
-               f'Общая стоимость: {i_hotel["total price"]:,.2f}' \
-               f'{config.CURRENCY}\n' \
+               f'Расстояние до цента: {i_hotel["distance to center"]} Км\n' \
+               f'Цена за сутки: {i_hotel["price"]:,.2f}$\n' \
+               f'Цена за {amount_days} дн{declination(amount_days)}: ' \
+               f'{i_hotel["total price"]:,.2f}$\n' \
                f'Адрес: {i_hotel["address"]}\n' \
-               f'Сайт: <a href="hotels.com/ho{i_hotel["id"]}">' \
-               f'hotels.com/ho{i_hotel["id"]}</a>'
-        querystring = {"id": i_hotel['id']}
-        photo_hotel = api_request(url, querystring, message)
-
-        for i_photo in photo_hotel['hotelImages']:
-            if len(photo) < user.photo_hotels:
-                photo.append(i_photo['baseUrl'].format(size='z'))
-            else:
-                break
+               f'Сайт: ' \
+               f'<a href="www.hotels.com/h{i_hotel["id"]}.Hotel-Information">'\
+               f'hotels.com/h{i_hotel["id"]}</a>'
 
         bot.send_media_group(
             message.chat.id,
@@ -178,33 +111,42 @@ def get_photo_hotels(message):
                     caption=text,
                     parse_mode='HTML'
                 )
-                if photo.index(url_photo) == 0
+                if i_hotel['photo'].index(url_photo) == 0
                 else telebot.types.InputMediaPhoto(url_photo)
-                for url_photo in photo]
+                for url_photo in i_hotel['photo']]
         )
-        bot.delete_message(message.chat.id, loading.message_id)
 
 
 def result(message):
     user = Users.get_user(message.from_user.id)
+    loading = bot.send_message(
+        message.from_user.id,
+        text='Пожалуйста, подождите...'
+    )
+    hotel_request(user, message)
+    add_history(message)
+    amount_hotels = len(user.hotel_list)
     bot.send_message(
         message.from_user.id,
-        text=f'Найдено {len(user.hotel_list)} отелей:'
+        text=f'Найдено {amount_hotels} отел{declination(amount_hotels)}:'
     )
+    amount_days = (user.check_out - user.check_in).days
     for i_hotel in user.hotel_list:
         bot.send_message(
             message.from_user.id,
             text=f'<b>"{i_hotel["name"]}"</b>\n '
-                 f'Расстояние до цента: {i_hotel["distance to center"]}\n '
+                 f'Расстояние до цента: {i_hotel["distance to center"]} Км\n '
                  f'Цена за сутки: '
-                 f'{i_hotel["price"]:,.2f} {config.CURRENCY}\n '
-                 f'Общая стоимость: '
-                 f'{i_hotel["total price"]:,.2f} {config.CURRENCY}\n '
+                 f'{i_hotel["price"]:,.2f}$\n '
+                 f'Цена за {amount_days} дн{declination(amount_days)} '
+                 f'{i_hotel["total price"]:,.2f}$\n '
                  f'Адрес: {i_hotel["address"]}\n '
-                 f'Сайт: <a href="hotels.com/ho{i_hotel["id"]}">'
-                 f'hotels.com/ho{i_hotel["id"]}</a>',
+                 f'Сайт: '
+                 f'<a href="hotels.com/ho{i_hotel["id"]}.Hotel-Information">'
+                 f'hotels.com/h{i_hotel["id"]}</a>',
             disable_web_page_preview=True
         )
+    bot.delete_message(message.message.chat.id, loading.message_id)
 
 
 def min_price(message):
