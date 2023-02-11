@@ -1,10 +1,10 @@
 import datetime
 import sqlite3
 from typing import List
-from loader import bot, calendar, calendar_1_callback
 from telebot import types
-from users.user_info import Users
 from telebot.types import Message
+from loader import bot, calendar, calendar_1_callback
+from users.user_info import Users
 
 
 def add_button(message: Message) -> None:
@@ -85,18 +85,18 @@ def declination(number: int, option: str) -> str:
     :return: возвращает окончание слова, склоненное слово.
     """
     exclusion_list: List[int] = [11, 12, 13, 14]
-    number = number % 10
+    remainder = number % 10
     if option == 'hotel':
-        if number == 1 and number not in exclusion_list:
+        if remainder == 1 and number % 100 not in exclusion_list:
             return 'ь'
-        elif number in [2, 3, 4] and number not in exclusion_list:
+        elif remainder in [2, 3, 4] and number % 100 not in exclusion_list:
             return 'я'
         else:
             return 'ей'
     elif option == 'day':
-        if number == 1 and number not in exclusion_list:
+        if remainder == 1 and number % 100 not in exclusion_list:
             return 'день'
-        elif number in [2, 3, 4] and number not in exclusion_list:
+        elif remainder in [2, 3, 4] and number % 100 not in exclusion_list:
             return 'дня'
         else:
             return 'дней'
@@ -110,5 +110,6 @@ def error_message(message: Message) -> None:
     """
     bot.send_message(
         chat_id=message.from_user.id,
-        text='Сервис временно не доступен.'
+        text='Сервис временно не доступен. '
+             'Повторите позже.'
     )

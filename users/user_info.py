@@ -1,9 +1,8 @@
-from __future__ import annotations
 from typing import Dict, List, Optional
 
 
 class Users:
-    all_users: Dict[int, Users] = dict()
+    all_users: Dict[int, 'Users'] = dict()
     """
     Класс описывающий пользователя телеграмм-бота
 
@@ -37,7 +36,7 @@ class Users:
         Users.add_user(user_id, self)
 
     @staticmethod
-    def get_user(user_id: int) -> Optional[Users]:
+    def get_user(user_id: int) -> Optional['Users']:
         """
         Метод, который определяет, существует ли пользователь
         с user_id в списке пользователей.
@@ -51,7 +50,7 @@ class Users:
         return Users.all_users.get(user_id)
 
     @classmethod
-    def add_user(cls, user_id: int, user: Users) -> None:
+    def add_user(cls, user_id: int, user: 'Users') -> None:
         """
         Метод, который добавляет нового пользователя в список пользователей
         """

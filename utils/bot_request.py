@@ -65,10 +65,11 @@ def city_request(user: Users, message: Message) -> None:
 
         city = api_request(url, payload, 'GET', message)
 
-        for i_city in city['sr']:
-            city_name = i_city['regionNames']['shortName'].lower()
-            if i_city['type'] == 'CITY' and city_name == user.city.lower():
-                user.city_id = i_city['gaiaId']
+        if city:
+            for i_city in city['sr']:
+                city_name = i_city['regionNames']['shortName'].lower()
+                if i_city['type'] == 'CITY' and city_name == user.city.lower():
+                    user.city_id = i_city['gaiaId']
 
     except Exception:
         error_message(message)
@@ -163,16 +164,16 @@ def hotel_details(user: Users, hotel_id: int, message: Message) -> Tuple:
 
         hotel_detail = hotel_data['data']['propertyInfo']
         photo = list()
-        count = 0
+        info_count = 0
 
         if hotel_detail:
             address = \
                 hotel_detail['summary']['location']['address']['addressLine']
             if user.photo_hotels:
                 for i_url in hotel_detail['propertyGallery']['images']:
-                    if count < user.photo_hotels:
+                    if info_count < user.photo_hotels:
                         photo.append(i_url['image']['url'])
-                        count += 1
+                        info_count += 1
                     else:
                         break
             return address, photo

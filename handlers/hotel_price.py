@@ -3,7 +3,7 @@ from users.user_info import Users
 from loader import bot
 from telebot.types import Message
 from utils.bot_methods import add_button, add_calendar, \
-    add_history, declination
+    add_history, declination, error_message
 from utils.bot_request import city_request, hotel_request, hotel_details
 
 
@@ -109,14 +109,15 @@ def get_photo_hotels(message: Message):
                  f'отел{declination(amount_hotels, "hotel")}:'
         )
         amount_days = (user.check_out - user.check_in).days
+        hotel_count = 1
         for i_hotel in user.hotel_list:
             info = hotel_details(user, i_hotel["id"], message)
-            text = f'<b>"{i_hotel["name"]}"</b>\n'\
+            text = f'<b>{hotel_count} "{i_hotel["name"]}"</b>\n'\
                    f'Расстояние до цента: ' \
                    f'{i_hotel["distance to center"]} Км\n'\
                    f'Цена за сутки: {i_hotel["price"]:,.2f}$\n' \
                    f'Цена за {amount_days} {declination(amount_days, "day")}:'\
-                   f'{i_hotel["total price"]:,.2f}$\n'\
+                   f' {i_hotel["total price"]:,.2f}$\n'\
                    f'Адрес: {info[0]}\n'\
                    f'Сайт: '\
                    f'<a href="www.hotels.com/' \
@@ -135,6 +136,7 @@ def get_photo_hotels(message: Message):
                     else telebot.types.InputMediaPhoto(url_photo)
                     for url_photo in info[1]]
             )
+            hotel_count += 1
 
         add_history(message)
 
@@ -145,6 +147,8 @@ def get_photo_hotels(message: Message):
         )
         bot.register_next_step_handler(msg, get_photo_hotels)
         return
+    except Exception:
+        error_message(message)
 
 
 def result(message):
@@ -168,7 +172,7 @@ def result(message):
              f'отел{declination(amount_hotels, "hotel")}:'
     )
     amount_days = (user.check_out - user.check_in).days
-
+    hotel_count = 1
     for i_hotel in user.hotel_list:
         new_loading = bot.send_message(
             chat_id=message.from_user.id,
@@ -178,11 +182,11 @@ def result(message):
 
         bot.send_message(
             chat_id=message.from_user.id,
-            text=f'<b>"{i_hotel["name"]}"</b>\n '
+            text=f'<b>{hotel_count} "{i_hotel["name"]}"</b>\n '
                  f'Расстояние до цента: {i_hotel["distance to center"]} Км\n '
                  f'Цена за сутки: '
                  f'{i_hotel["price"]:,.2f}$\n '
-                 f'Цена за {amount_days} {declination(amount_days, "day")} '
+                 f'Цена за {amount_days} {declination(amount_days, "day")}: '
                  f'{i_hotel["total price"]:,.2f}$\n '
                  f'Адрес: {info[0]}\n '
                  f'Сайт: '
@@ -191,6 +195,7 @@ def result(message):
             disable_web_page_preview=True
         )
         bot.delete_message(message.message.chat.id, new_loading.message_id)
+        hotel_count += 1
 
     add_history(message)
 
