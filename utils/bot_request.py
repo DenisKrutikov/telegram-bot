@@ -1,46 +1,87 @@
 import json
 import requests
+from typing import Dict, Tuple
 from config_data import config
-from loader import bot
-
-timeout = 10
-headers = {
-    "content-type": "application/json",
-    "X-RapidAPI-Key": config.RAPID_API_KEY,
-    "X-RapidAPI-Host": "hotels4.p.rapidapi.com"
-}
+from telebot.types import Message
+from users.user_info import Users
+from utils.bot_methods import error_message
 
 
-def city_request(user, message):
+def api_request(url: str,
+                payload: dict,
+                method_type: str,
+                message: Message
+                ) -> Dict:
+    """
+    Функция, которая делает запрос к API.
+
+    :param url: передается ссылка на запрос.
+    :param payload: передаются параметры запроса.
+    :param method_type: передается тип метода запроса.
+    :param message: передается сообщение чата телеграмм-бота.
+    :return: возвращается словарь с данными.
+    """
+    try:
+        timeout = 10
+        headers = {
+            "content-type": "application/json",
+            "X-RapidAPI-Key": config.RAPID_API_KEY,
+            "X-RapidAPI-Host": "hotels4.p.rapidapi.com"
+        }
+
+        if method_type == 'GET':
+            response = requests.get(
+                url=url,
+                headers=headers,
+                params=payload,
+                timeout=timeout
+            )
+        else:
+            response = requests.post(
+                url=url,
+                json=payload,
+                headers=headers,
+                timeout=timeout
+            )
+
+        if response.status_code == requests.codes.ok:
+            return json.loads(response.text)
+
+    except Exception:
+        error_message(message)
+
+
+def city_request(user: Users, message: Message) -> None:
+    """
+    Функция, которая обрабатывает ответ запроса и получает id города.
+
+    :param user: передается пользователь.
+    :param message: передается сообщение чата телеграмм-бота.
+    """
     try:
         url = 'https://hotels4.p.rapidapi.com/locations/v3/search'
 
-        querystring = {'q': user.city, 'locale': config.LOCALE}
+        payload = {'q': user.city, 'locale': config.LOCALE}
 
-        response = requests.get(
-            url=url,
-            headers=headers,
-            params=querystring,
-            timeout=timeout
-        )
-        city = json.loads(response.text)
+        city = api_request(url, payload, 'GET', message)
 
-        for i_city in city['sr']:
-            if i_city['type'] == 'CITY' and i_city['regionNames']['shortName'].lower() == user.city.lower():
-                user.city_id = i_city['gaiaId']
-    except requests.exceptions.ReadTimeout:
-        bot.send_message(
-            message.from_user.id,
-            text='Сервис не отвечает. Попробуйте позже.'
-        )
-    except TypeError:
-        bot.send_message(
-            message.from_user.id,
-            text='Ошибка сервиса. Попробуйте еще раз.'
-        )
+        if city:
+            for i_city in city['sr']:
+                city_name = i_city['regionNames']['shortName'].lower()
+                if i_city['type'] == 'CITY' and city_name == user.city.lower():
+                    user.city_id = i_city['gaiaId']
+
+    except Exception:
+        error_message(message)
 
 
-def hotel_request(user, message):
+def hotel_request(user: Users, message: Message) -> None:
+    """
+    Функция, которая обрабатывает ответ запроса и получает данные по отелям.
+
+    :param user: передается пользователь.
+    :param message: передается сообщение чата телеграмм-бота.
+    """
     try:
         if user.command == '/beastdeal':
             sort_order = 'DISTANCE'
@@ -79,15 +120,10 @@ def hotel_request(user, message):
             }}
         }
 
-        response = requests.post(
-            url=url,
-            json=payload,
-            headers=headers,
-            timeout=timeout
-        )
-        hotels = json.loads(response.text)
+        hotels = api_request(url, payload, 'POST', message)
 
         amount_days = (user.check_out - user.check_in).days
+
         for i_hotel in hotels['data']['propertySearch']['properties']:
             hotel_info = dict()
             hotel_info['id'] = i_hotel['id']
@@ -96,33 +132,23 @@ def hotel_request(user, message):
             hotel_info['total price'] = hotel_info['price'] * amount_days
             hotel_info['distance to center'] = \
                 i_hotel['destinationInfo']['distanceFromDestination']['value']
-            hotel_detail = hotel_details(i_hotel['id'], message)
-            hotel_info['address'] = \
-                hotel_detail['summary']['location']['address']['addressLine']
-            if user.photo_hotels:
-                photo = list()
-                count = 0
-                for i_url in hotel_detail['propertyGallery']['images']:
-                    if count < user.photo_hotels:
-                        photo.append(i_url['image']['url'])
-                        count += 1
-                    else:
-                        break
-                hotel_info['photo'] = photo
+
             user.hotel_list.append(hotel_info)
-    except requests.exceptions.ReadTimeout:
-        bot.send_message(
-            message.from_user.id,
-            text='Сервис не отвечает. Попробуйте позже.'
-        )
-    except TypeError:
-        bot.send_message(
-            message.from_user.id,
-            text='Ошибка сервиса. Попробуйте еще раз.'
-        )
+
+    except Exception:
+        error_message(message)
 
 
-def hotel_details(hotel_id, message):
+def hotel_details(user: Users, hotel_id: int, message: Message) -> Tuple:
+    """
+    Функция, которая обрабатывает ответ запроса
+    и получает дополнительные данные по отелям.
+
+    :param user: передается пользователь.
+    :param hotel_id: передается id отеля.
+    :param message: передается сообщение чата телеграмм-бота.
+    :return: возвращает кортеж с адресом и списком url фото.
+    """
     try:
         url = "https://hotels4.p.rapidapi.com/properties/v2/detail"
 
@@ -134,26 +160,26 @@ def hotel_details(hotel_id, message):
             "propertyId": hotel_id
         }
 
-        response = requests.post(
-            url=url,
-            json=payload,
-            headers=headers,
-            timeout=timeout
-        )
-        hotel_data = json.loads(response.text)
+        hotel_data = api_request(url, payload, 'POST', message)
 
-        if hotel_data['data']['propertyInfo']:
-            return hotel_data['data']['propertyInfo']
+        hotel_detail = hotel_data['data']['propertyInfo']
+        photo = list()
+        info_count = 0
+
+        if hotel_detail:
+            address = \
+                hotel_detail['summary']['location']['address']['addressLine']
+            if user.photo_hotels:
+                for i_url in hotel_detail['propertyGallery']['images']:
+                    if info_count < user.photo_hotels:
+                        photo.append(i_url['image']['url'])
+                        info_count += 1
+                    else:
+                        break
+            return address, photo
         else:
             raise ValueError
 
-    except requests.exceptions.ReadTimeout:
-        bot.send_message(
-            message.from_user.id,
-            text='Сервис не отвечает. Попробуйте позже.'
-        )
-    except ValueError:
-        bot.send_message(
-            message.from_user.id,
-            text='Ошибка сервиса. Попробуйте еще раз.'
-        )
+    except Exception:
+        error_message(message)
+        return 'error', ['https://disk.yandex.ru/i/TZ5v6qnX4HR7TQ']
